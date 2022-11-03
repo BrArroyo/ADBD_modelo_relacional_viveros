@@ -1,5 +1,6 @@
 /**
- * Commands used to create 5 tables in the database: vivero, zona. empleado, producto, cliente.
+ * Commands used to create 5 tables in the database: vivero, zona. empleado, producto, cliente, cliente afiliado, cliente no afiliado, tiene y pedido.
+ * 
  * usage:
  *  sudo su postgres
  *  psql
@@ -16,7 +17,11 @@ DROP TABLE IF EXISTS zona;
 DROP TABLE IF EXISTS empleado;
 DROP TABLE IF EXISTS producto;
 DROP TABLE IF EXISTS cliente;
+DROP TABLE IF EXISTS cliente_afiliado;
+DROP TABLE IF EXISTS cliente_no_afiliado
 DROP TABLE IF EXISTS tiene;
+DROP TABLE IF EXISTS pedido;
+
 
 /* -- CREATE TABLES -- */
 /* Create the table 'vivero' */
@@ -31,11 +36,27 @@ CREATE TABLE zona (
   id_zona INT GENERATED ALWAYS AS IDENTIFY,
   id_vivero INT,
   nombre_zona VARCHAR(20) NOT NULL,
-  numero_ventas INT, --- atributo derivado, se le tiene que añadir un disparador
+  numero_ventas INT, --- atributo derivado
   PRIMARY KEY(id_zona)
   CONSTRAINT fk_id_vivero 
     FOREIGN KEY(id_vivero) 
       REFERENCES vivero(id_vivero) 
+        ON DELETE CASCADE
+);
+
+/* Create the table 'empleado' */
+CREATE TABLE empleado (
+  dni_empleado INT GENERATED ALWAYS AS IDENTIFY,
+  id_zona INT,
+  nombre_empleado VARCHAR(255) NOT NULL,
+  historico VARCHAR(255) NOT NULL, --- atributo derivado 
+  puesto VARCHAR(255) NOT NULL,
+  fecha_inicio DATE NOT NULL,
+  fecha_fin DATE,
+  PRIMARY KEY(dni_empleado)
+  CONSTRAINT fk_id_zona 
+    FOREIGN KEY(id_zona) 
+      REFERENCES zona(id_zona) 
         ON DELETE CASCADE
 );
 
@@ -44,8 +65,40 @@ CREATE TABLE producto (
   id_producto INT GENERATED ALWAYS AS IDENTIFY,
   nombre_producto VARCHAR(255) NOT NULL,
   precio FLOAT,
-  numero_stock INT, --- atributo derivado, se le tiene que añadir un disparador
+  numero_stock INT, --- atributo derivado
   PRIMARY KEY(id_producto)
+);
+
+/* Create the table 'cliente' */
+CREATE TABLE cliente (
+  dni_cliente VARCHAR(9) NOT NULL,
+  nombre_cliente VALUES(255) NOT NULL,
+  tipo_cliente VARCHAR(10) NOT NULL,
+  PRIMARY KEY(dni_cliente)
+);
+
+/* Create the table 'cliente afiliado' */
+CREATE TABLE cliente_afiliado (
+  dni_cliente VARCHAR(9) NOT NULL,
+  bonificacion FLOAT,
+  fecha_ingreso VARCHAR(6) NOT NULL,
+  total_mensual FLOAT,
+  PRIMARY KEY ( dni_cliente )
+    CONSTRAINT fk_dni_cliente
+      FOREIGN KEY(dni_cliente) 
+        REFERENCES cliente(dni_cliente) 
+          ON DELETE CASCADE
+);
+
+/* Create the table 'cliente no afiliado */
+CREATE TABLE cliente_no_afiliado ( 
+  dni_cliente VARCHAR(9) NOT NULL, 
+  numero_compras INT,
+  PRIMARY KEY ( dni_cliente )
+    CONSTRAINT fk_dni_cliente
+      FOREIGN KEY(dni_cliente) 
+        REFERENCES cliente(dni_cliente) 
+          ON DELETE CASCADE
 );
 
 /* Create the table 'tiene' */
@@ -64,32 +117,27 @@ CREATE TABLE tiene (
         ON DELETE CASCADE
 );
 
-/* Create the table 'empleado' */
-CREATE TABLE empleado (
-  dni_empleado INT GENERATED ALWAYS AS IDENTIFY,
-  id_zona INT,
-  nombre_empleado VARCHAR(255) NOT NULL,
-  historico VARCHAR(255) NOT NULL, --- atributo derivado, se le tiene que añadir un disparador
-  puesto VARCHAR(255) NOT NULL,
-  fecha_inicio DATE NOT NULL,
-  fecha_fin DATE,
-  PRIMARY KEY(dni_empleado)
-  CONSTRAINT fk_id_zona 
-    FOREIGN KEY(id_zona) 
-      REFERENCES zona(id_zona) 
-        ON DELETE CASCADE
-);
-
-/* Create the table 'cliente' */
-CREATE TABLE cliente (
+/* Create the table 'pedido */
+CREATE TABLE pedido (
+  dni_empleado VARCHAR(9) NOT NULL,
+  id_producto INT NOT NULL,
   dni_cliente VARCHAR(9) NOT NULL,
-  tipo_cliente VARCHAR(10) NOT NULL,
-  bonificacion,
-  fecha_ingreso VARCHAR(6) NOT NULL,
-  total_mensual FLOAT, --- atributo derivado, se le tiene que añadir un disparador
-  PRIMARY KEY(dni_cliente)
+  fecha_compra DATE NOT NULL,
+  precio_pedido FLOAT NOT NULL,
+  PRIMARY KEY ( dni_empleado, id_producto, dni_cliente )
+    CONSTRAINT fk_dni_empleado 
+      FOREIGN KEY(dni_empleado) 
+        REFERENCES empleado(dni_empleado) 
+          ON DELETE CASCADE
+    CONSTRAINT fk_id_producto
+      FOREIGN KEY(id_producto) 
+        REFERENCES producto(id_producto) 
+          ON DELETE CASCADE
+    CONSTRAINT fk_dni_cliente
+      FOREIGN KEY(dni_cliente) 
+        REFERENCES cliente(dni_cliente) 
+          ON DELETE CASCADE
 );
-
 
 /* -- INSERT DATA -- */
 /* Insert data into the table 'vivero' */
@@ -113,11 +161,11 @@ VALUES
 /* Insert data into the table 'producto' */
 INSERT INTO producto VALUES (id_producto, nombre_producto, precio, numero_stock)
 VALUES
-  (1, 'Producto 1', 61.65, 37),
-  (2, 'Producto 2', 10.3, 42),
-  (3, 'Producto 3', 19.15, 75),
-  (4, 'Producto 4', 11.21, 39),
-  (5, 'Producto 5', 26.88, 80);
+  (1, 'Helecho asplenium', 61.65, 300),
+  (2, 'Helecho Dicksonia', 10.3, 250),
+  (3, 'Lentejas de agua', 19.15, 150),
+  (4, 'Petunia', 11.21, 100),
+  (5, 'Croton', 26.88, 90);
 
 /* Insert data into the table 'tiene' */
 INSERT INTO tiene VALUES (id_zona, id_producto, stock)
@@ -129,33 +177,15 @@ VALUES
   (1, 5, 50),
   (2, 1, 10),
   (2, 2, 20),
-  (2, 3, 30),
-  (2, 4, 40),
-  (2, 5, 50),
-  (3, 1, 10),
-  (3, 2, 20),
-  (3, 3, 30),
-  (3, 4, 40),
-  (3, 5, 50),
-  (4, 1, 10),
-  (4, 2, 20),
-  (4, 3, 30),
-  (4, 4, 40),
-  (4, 5, 50),
-  (5, 1, 10),
-  (5, 2, 20),
-  (5, 3, 30),
-  (5, 4, 40),
-  (5, 5, 50);
-  
+
 /* Insert data into the table 'empleado' */
 INSERT INTO empleado VALUES (dni_empleado, nombre_empleado, historico)
 VALUES
-  ('14769497W', 'Salma Blasco', '0'),
-  ('30094494Y', 'Ismail Salvador', '0'),
-  ('41603427S', 'Jose Antonio Megias', '0'),
-  ('86537048P', 'Angeles Cabello', '0'),
-  ('20891673Z', 'Jess Duque', '0');
+  ('14769497W', 'Salma Blasco', 'Ha realizado 20 ventas'),
+  ('30094494Y', 'Ismail Salvador', 'Ha realizado 30 venta'),
+  ('41603427S', 'Jose Antonio Megias', 'Ha reliado 40 ventas'),
+  ('86537048P', 'Angeles Cabello', 'Ha realizado 5 ventas'),
+  ('20891673Z', 'Jess Duque', 'Ha realizado 55 ventas');
   
 /* Insert data into the table 'cliente' */
 INSERT INTO cliente VALUES (dni_cliente, tipo_cliente, bonificacion, fecha_ingreso, total_mensual)
@@ -166,7 +196,27 @@ VALUES
   ('51673145B', 'Aquilino Criado', 20.62, '04/04/2000', 6544.13),
   ('82367086S', 'Jan Puerta', 54.36, '05/05/2000',  5246.95);
 
-/* -- SELECT DATA FROM TABLES -- */
+/* Insert data into the table 'cliente_afiliado' */
+INSERT INTO cliente_afiliado VALUES(dni_cliente, bonificacion, fecha_ingreso, total_mensual)
+VALUES
+  ('45714294T', 49.30, '01/01/2000', 9094.68),
+  ('56490217D', 40.8,  '03/03/2000', 6380.35),
+  ('82367086S', 34.36, '05/05/2000',  5246.95);
+
+/* Insert data into the table 'cliente no afiliado' */
+INSERT INTO cliente_no_afiliado VALUES(dni_cliente, numero_compras)
+  ('53059518J', 12),
+  ('51673145B', 20);
+  
+/* Insert data into the table 'pedido' */  
+INSERT INTO pedido VALUES (dni_empleado, id_producto, dni_cliente, fecha_compra, precio_pedido)
+  ('14769497W', 1, '53059518J', '01/04/2022', 1213.46),
+  ('30094494Y', 2, '56490217D', '16/07/2022', 5242.05),
+  ('41603427S', 3, '82367086S', '10/10/2022', 10010.15),
+  ('86537048P', 4, '45714294T', '23/02/2022', 9240.78),
+  ('14769497W', 5, '45714294T', '02/11/2022', 7728.99);
+
+/* -- SELECT DATA FROM TABLES -- */ 
 /* select all the data from the table 'vivero' */
 SELECT * FROM vivero;
 
@@ -176,11 +226,20 @@ SELECT * FROM zona;
 /* select all the data from the table 'producto' */
 SELECT * FROM producto;
 
-/* select all the data from the table 'tiene' */
-SELECT * FROM tiene;
-
 /* select all the data from the table 'empleado' */
 SELECT * FROM empleado;
 
 /* select all the data from the table 'cliente' */
 SELECT * FROM cliente;
+
+/* select all the data from the table 'cliente afiliado' */
+SELECT * FROM cliente_afiliado;
+
+/* select all the data from the table 'cliente no afiliado' */
+SELECT * FROM cliente_no_afiliado;
+
+/* select all the data from the table 'tiene' */
+SELECT * FROM tiene;
+
+/* select all the data from the table 'pedido' */
+SELECT * FROM pedido;
